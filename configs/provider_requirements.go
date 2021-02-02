@@ -17,6 +17,8 @@ type RequiredProvider struct {
 	Type        addrs.Provider
 	Requirement VersionConstraint
 	DeclRange   hcl.Range
+	//Aliases     []*ProviderConfigRef
+	Aliases []string
 }
 
 type RequiredProviders struct {
@@ -113,9 +115,22 @@ func decodeRequiredProvidersBlock(block *hcl.Block) (*RequiredProviders, hcl.Dia
 					}
 				}
 			}
+
+			// FIXME: this will need to be refactored to work with the raw hcl
+			// in order to allow references here
+			if expr.Type().HasAttribute("aliases") {
+				aliases := expr.GetAttr("aliases")
+				if !aliases.IsNull() {
+					for _, v := range aliases.AsValueSlice() {
+						rp.Aliases = append(rp.Aliases, v.AsString())
+					}
+				}
+			}
+
 			attrTypes := expr.Type().AttributeTypes()
 			for name := range attrTypes {
-				if name == "version" || name == "source" {
+				switch name {
+				case "version", "source", "aliases":
 					continue
 				}
 				diags = append(diags, &hcl.Diagnostic{
