@@ -17,7 +17,7 @@ type RequiredProvider struct {
 	Type        addrs.Provider
 	Requirement VersionConstraint
 	DeclRange   hcl.Range
-	//Aliases     []*ProviderConfigRef
+	//Aliases    []addrs.LocalProviderConfig
 	Aliases []string
 }
 

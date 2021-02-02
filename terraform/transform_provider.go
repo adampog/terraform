@@ -3,6 +3,7 @@ package terraform
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/terraform/addrs"
@@ -603,6 +604,49 @@ func (t *ProviderConfigTransformer) transformSingle(g *Graph, c *configs.Config)
 		// if this succeeds, then we know there's nothing in the body.
 		_, diags := p.Config.Content(&hcl.BodySchema{})
 		t.proxiable[key] = !diags.HasErrors()
+	}
+
+	if mod.ProviderRequirements != nil {
+		// Add implied provider configs from the required_providers
+		// Since we're still treating empty configs as proxies, we can just add
+		// these as empty configs too. We'll ensure that these are given a
+		// configuration during validation to prevent them from becoming
+		// fully-fledged config instances.
+		for _, p := range mod.ProviderRequirements.RequiredProviders {
+			for _, alias := range p.Aliases {
+				// FIXME: HACKY STRING MUNGING
+				alias := strings.Split(alias, ".")[1]
+
+				addr := addrs.AbsProviderConfig{
+					Provider: mod.ProviderForLocalConfig(addrs.LocalProviderConfig{
+						LocalName: p.Name,
+						Alias:     alias,
+					}),
+					Module: path,
+					Alias:  alias,
+				}
+
+				key := addr.String()
+				if _, ok := t.providers[key]; ok {
+					continue
+				}
+
+				abstract := &NodeAbstractProvider{
+					Addr: addr,
+				}
+				var v dag.Vertex
+				if t.Concrete != nil {
+					v = t.Concrete(abstract)
+				} else {
+					v = abstract
+				}
+
+				// Add it to the graph
+				g.Add(v)
+				t.providers[key] = v.(GraphNodeProvider)
+				t.proxiable[key] = true
+			}
+		}
 	}
 
 	// Now replace the provider nodes with proxy nodes if a provider was being
