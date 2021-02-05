@@ -215,7 +215,7 @@ terraform {
   required_providers {
     test = {
       source = "registry.terraform.io/hashicorp/test"
-      aliases = ["test.x"]
+      configuration_aliases = ["test.x"]
 	}
   }
 }
