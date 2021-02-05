@@ -118,8 +118,8 @@ func decodeRequiredProvidersBlock(block *hcl.Block) (*RequiredProviders, hcl.Dia
 
 			// FIXME: this will need to be refactored to work with the raw hcl
 			// in order to allow references here
-			if expr.Type().HasAttribute("aliases") {
-				aliases := expr.GetAttr("aliases")
+			if expr.Type().HasAttribute("configuration_aliases") {
+				aliases := expr.GetAttr("configuration_aliases")
 				if !aliases.IsNull() {
 					for _, v := range aliases.AsValueSlice() {
 						rp.Aliases = append(rp.Aliases, v.AsString())
@@ -130,7 +130,7 @@ func decodeRequiredProvidersBlock(block *hcl.Block) (*RequiredProviders, hcl.Dia
 			attrTypes := expr.Type().AttributeTypes()
 			for name := range attrTypes {
 				switch name {
-				case "version", "source", "aliases":
+				case "version", "source", "configuration_aliases":
 					continue
 				}
 				diags = append(diags, &hcl.Diagnostic{
