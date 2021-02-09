@@ -63,6 +63,8 @@ type Meta struct {
 	// do some default behavior instead if so, rather than panicking.
 	Streams *terminal.Streams
 
+	View *views.View
+
 	Color            bool     // True if output should be colored
 	GlobalPluginDirs []string // Additional paths to search for plugins
 	Ui               cli.Ui   // Ui for output
@@ -339,10 +341,6 @@ func (m *Meta) StdinPiped() bool {
 	return !m.Streams.Stdin.IsTerminal()
 }
 
-func (m *Meta) View() views.View {
-	return views.NewView(m.Ui, m.Color, m.compactWarnings, m.OutputColumns(), m.ErrorColumns(), m.configSources)
-}
-
 // InterruptibleContext returns a context.Context that will be cancelled
 // if the process is interrupted by a platform-specific interrupt signal.
 //
@@ -504,6 +502,7 @@ func (m *Meta) contextOpts() (*terraform.ContextOpts, error) {
 }
 
 // defaultFlagSet creates a default flag set for commands.
+// See also command/arguments/default.go
 func (m *Meta) defaultFlagSet(n string) *flag.FlagSet {
 	f := flag.NewFlagSet(n, flag.ContinueOnError)
 	f.SetOutput(ioutil.Discard)
@@ -621,6 +620,8 @@ func (m *Meta) process(args []string) []string {
 			Ui:         m.oldUi,
 		},
 	}
+
+	m.View.EnableColor(m.Color)
 
 	return args
 }

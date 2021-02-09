@@ -11,6 +11,7 @@ import (
 	"github.com/zclconf/go-cty/cty/convert"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 
+	"github.com/hashicorp/terraform/command/arguments"
 	"github.com/hashicorp/terraform/repl"
 	"github.com/hashicorp/terraform/states"
 	"github.com/hashicorp/terraform/tfdiags"
@@ -23,14 +24,14 @@ type Output interface {
 	Diagnostics(diags tfdiags.Diagnostics)
 }
 
-func NewOutput(vt ViewType, view View) Output {
+func NewOutput(vt arguments.ViewType, view *View) Output {
 	switch vt {
-	case ViewJSON:
-		return &OutputJSON{View: view}
-	case ViewRaw:
-		return &OutputRaw{View: view}
-	case ViewHuman:
-		return &OutputHuman{View: view}
+	case arguments.ViewJSON:
+		return &OutputJSON{View: *view}
+	case arguments.ViewRaw:
+		return &OutputRaw{View: *view}
+	case arguments.ViewHuman:
+		return &OutputHuman{View: *view}
 	default:
 		panic(fmt.Sprintf("unknown view type %v", vt))
 	}

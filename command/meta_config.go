@@ -329,6 +329,7 @@ func (m *Meta) initConfigLoader() (*configload.Loader, error) {
 			return nil, err
 		}
 		m.configLoader = loader
+		m.View.SetConfigSources(loader.Sources)
 	}
 	return m.configLoader, nil
 }

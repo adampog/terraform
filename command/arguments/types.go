@@ -1,4 +1,4 @@
-package views
+package arguments
 
 type ViewType rune
 

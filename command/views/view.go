@@ -1,38 +1,43 @@
 package views
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/terraform/command/format"
+	"github.com/hashicorp/terraform/internal/terminal"
 	"github.com/hashicorp/terraform/tfdiags"
-	"github.com/mitchellh/cli"
 	"github.com/mitchellh/colorstring"
 )
 
 type View struct {
-	ui              cli.Ui
+	streams         *terminal.Streams
 	colorize        *colorstring.Colorize
 	compactWarnings bool
-	outputColumns   int
-	errorColumns    int
 	configSources   func() map[string][]byte
 }
 
-func NewView(ui cli.Ui, color, compactWarnings bool, outputColumns, errorColumns int, configSources func() map[string][]byte) View {
-	return View{
-		ui: ui,
+func NewView(streams *terminal.Streams) *View {
+	return &View{
+		streams: streams,
 		colorize: &colorstring.Colorize{
 			Colors:  colorstring.DefaultColors,
-			Disable: !color,
+			Disable: true,
 			Reset:   true,
 		},
-		compactWarnings: compactWarnings,
-		outputColumns:   outputColumns,
-		errorColumns:    errorColumns,
-		configSources:   configSources,
+		configSources: func() map[string][]byte { return nil },
 	}
 }
 
 func (v *View) output(s string) {
-	v.ui.Output(s)
+	fmt.Fprint(v.streams.Stdout.File, s)
+}
+
+func (v *View) EnableColor(color bool) {
+	v.colorize.Disable = !color
+}
+
+func (v *View) SetConfigSources(cb func() map[string][]byte) {
+	v.configSources = cb
 }
 
 func (v *View) Diagnostics(diags tfdiags.Diagnostics) {
@@ -61,7 +66,7 @@ func (v *View) Diagnostics(diags tfdiags.Diagnostics) {
 		if useCompact {
 			msg := format.DiagnosticWarningsCompact(diags, v.colorize)
 			msg = "\n" + msg + "\nTo see the full warning notes, run Terraform without -compact-warnings.\n"
-			v.ui.Warn(msg)
+			v.output(msg)
 			return
 		}
 	}
@@ -69,18 +74,24 @@ func (v *View) Diagnostics(diags tfdiags.Diagnostics) {
 	for _, diag := range diags {
 		var msg string
 		if v.colorize.Disable {
-			msg = format.DiagnosticPlain(diag, v.configSources(), v.errorColumns)
+			msg = format.DiagnosticPlain(diag, v.configSources(), v.streams.Stderr.Columns())
 		} else {
-			msg = format.Diagnostic(diag, v.configSources(), v.colorize, v.errorColumns)
+			msg = format.Diagnostic(diag, v.configSources(), v.colorize, v.streams.Stderr.Columns())
 		}
 
-		switch diag.Severity() {
-		case tfdiags.Error:
-			v.ui.Error(msg)
-		case tfdiags.Warning:
-			v.ui.Warn(msg)
-		default:
-			v.ui.Output(msg)
+		if diag.Severity() == tfdiags.Error {
+			fmt.Fprint(v.streams.Stderr.File, msg)
+		} else {
+			fmt.Fprint(v.streams.Stdout.File, msg)
 		}
 	}
 }
+
+func (v *View) HelpPrompt(command string) {
+	fmt.Fprintf(v.streams.Stderr.File, helpPrompt, command)
+}
+
+const helpPrompt = `
+For more help on using this command, run:
+  terraform %s -help
+`
