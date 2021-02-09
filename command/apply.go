@@ -231,7 +231,7 @@ func (c *ApplyCommand) Run(args []string) int {
 		outputValues := op.State.RootModule().OutputValues
 		if len(outputValues) > 0 {
 			c.Ui.Output(c.Colorize().Color("[reset][bold][green]\nOutputs:\n\n"))
-			view := views.OutputText{View: c.View()}
+			view := views.OutputHuman{View: c.View()}
 			view.Output("", outputValues)
 		}
 	}

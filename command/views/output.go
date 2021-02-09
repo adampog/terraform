@@ -23,15 +23,28 @@ type Output interface {
 	Diagnostics(diags tfdiags.Diagnostics)
 }
 
+func NewOutput(vt ViewType, view View) Output {
+	switch vt {
+	case ViewJSON:
+		return &OutputJSON{View: view}
+	case ViewRaw:
+		return &OutputRaw{View: view}
+	case ViewHuman:
+		return &OutputHuman{View: view}
+	default:
+		panic(fmt.Sprintf("unknown view type %v", vt))
+	}
+}
+
 // The OutputText implementation renders outputs in a format equivalent to HCL
 // source. This uses the same formatting logic as in the console REPL.
-type OutputText struct {
+type OutputHuman struct {
 	View
 }
 
-var _ Output = (*OutputText)(nil)
+var _ Output = (*OutputHuman)(nil)
 
-func (v *OutputText) Output(name string, outputs map[string]*states.OutputValue) tfdiags.Diagnostics {
+func (v *OutputHuman) Output(name string, outputs map[string]*states.OutputValue) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 
 	if len(outputs) == 0 {

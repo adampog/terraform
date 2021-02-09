@@ -13,34 +13,34 @@ import (
 // from a Terraform state and prints it.
 type OutputCommand struct {
 	Meta
-
-	// Flags
-	name       string
-	jsonOutput bool
-	rawOutput  bool
-	statePath  string
 }
 
-func (c *OutputCommand) Run(args []string) int {
+type outputArguments struct {
+	name      string
+	viewType  views.ViewType
+	statePath string
+}
+
+func (c *OutputCommand) Run(cliArgs []string) int {
 	// Parse and validate flags
-	err := c.ParseFlags(args)
+	args, err := c.ParseArguments(cliArgs)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		c.Ui.Error(c.Help())
 		return 1
 	}
 
-	view := c.View()
+	view := views.NewOutput(args.viewType, c.View())
 
 	// Fetch data from state
-	outputs, diags := c.Outputs()
+	outputs, diags := c.Outputs(args.statePath)
 	if diags.HasErrors() {
 		view.Diagnostics(diags)
 		return 1
 	}
 
 	// Render the view
-	viewDiags := view.Output(c.name, outputs)
+	viewDiags := view.Output(args.name, outputs)
 	diags = diags.Append(viewDiags)
 
 	view.Diagnostics(diags)
@@ -52,56 +52,58 @@ func (c *OutputCommand) Run(args []string) int {
 	return 0
 }
 
-func (c *OutputCommand) ParseFlags(args []string) error {
-	args = c.Meta.process(args)
+func (c *OutputCommand) ParseArguments(cliArgs []string) (*outputArguments, error) {
+	// Extract -no-color
+	cliArgs = c.Meta.process(cliArgs)
+
+	args := &outputArguments{}
+
+	var jsonOutput, rawOutput bool
 	cmdFlags := c.Meta.defaultFlagSet("output")
-	cmdFlags.BoolVar(&c.jsonOutput, "json", false, "json")
-	cmdFlags.BoolVar(&c.rawOutput, "raw", false, "raw")
-	cmdFlags.StringVar(&c.statePath, "state", "", "path")
+	cmdFlags.BoolVar(&jsonOutput, "json", false, "json")
+	cmdFlags.BoolVar(&rawOutput, "raw", false, "raw")
+	cmdFlags.StringVar(&args.statePath, "state", "", "path")
 	cmdFlags.Usage = func() { c.Ui.Error(c.Help()) }
-	if err := cmdFlags.Parse(args); err != nil {
-		return fmt.Errorf("Error parsing command-line flags: %s\n", err.Error())
+	if err := cmdFlags.Parse(cliArgs); err != nil {
+		return nil, fmt.Errorf("Error parsing command-line flags: %s\n", err.Error())
 	}
 
-	args = cmdFlags.Args()
-	if len(args) > 1 {
-		return fmt.Errorf("The output command expects exactly one argument with the name\n" +
+	cliArgs = cmdFlags.Args()
+	if len(cliArgs) > 1 {
+		return nil, fmt.Errorf("The output command expects exactly one argument with the name\n" +
 			"of an output variable or no arguments to show all outputs.\n")
 	}
 
-	if c.jsonOutput && c.rawOutput {
-		return fmt.Errorf("The -raw and -json options are mutually-exclusive.\n")
+	if jsonOutput && rawOutput {
+		return nil, fmt.Errorf("The -raw and -json options are mutually-exclusive.\n")
 	}
 
-	if c.rawOutput && len(args) == 0 {
-		return fmt.Errorf("You must give the name of a single output value when using the -raw option.\n")
+	if rawOutput && len(cliArgs) == 0 {
+		return nil, fmt.Errorf("You must give the name of a single output value when using the -raw option.\n")
 	}
 
-	if len(args) > 0 {
-		c.name = args[0]
-	}
-
-	return nil
-}
-
-func (c *OutputCommand) View() views.Output {
-	view := c.Meta.View()
 	switch {
-	case c.jsonOutput:
-		return &views.OutputJSON{View: view}
-	case c.rawOutput:
-		return &views.OutputRaw{View: view}
+	case jsonOutput:
+		args.viewType = views.ViewJSON
+	case rawOutput:
+		args.viewType = views.ViewRaw
 	default:
-		return &views.OutputText{View: view}
+		args.viewType = views.ViewHuman
 	}
+
+	if len(cliArgs) > 0 {
+		args.name = cliArgs[0]
+	}
+
+	return args, nil
 }
 
-func (c *OutputCommand) Outputs() (map[string]*states.OutputValue, tfdiags.Diagnostics) {
+func (c *OutputCommand) Outputs(statePath string) (map[string]*states.OutputValue, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 
 	// Allow state path override
-	if c.statePath != "" {
-		c.Meta.statePath = c.statePath
+	if statePath != "" {
+		c.Meta.statePath = statePath
 	}
 
 	// Load the backend
